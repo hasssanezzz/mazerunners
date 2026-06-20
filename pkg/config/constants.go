@@ -9,15 +9,19 @@ const (
 	CellWall
 	CellTrap
 	CellCoin
+	CellWood
 )
 
 var (
-	ColorBlack   = color.RGBA{39, 51, 56, 255}   // dark slate
-	ColorPrimary = color.RGBA{43, 87, 72, 255}   // forest green (player)
-	ColorBG      = color.RGBA{97, 135, 100, 255} // muted green (background)
-	ColorRed     = color.RGBA{245, 73, 39, 255}  // trap / pointer
-	ColorGrey    = color.RGBA{70, 80, 88, 255}   // wall
-	ColorGold    = color.RGBA{255, 191, 00, 255}
+	ColorBlack   = color.RGBA{39, 51, 56, 255} // dark slate
+	ColorPrimary = color.RGBA{57, 177, 209, 255}
+
+	ColorBG   = color.RGBA{255, 242, 219, 255}
+	ColorWood = color.RGBA{157, 102, 56, 255}
+
+	ColorRed  = color.RGBA{245, 73, 39, 255}
+	ColorGrey = color.RGBA{70, 80, 88, 255} // wall
+	ColorGold = color.RGBA{255, 191, 00, 255}
 
 	ColorWhite       = color.RGBA{255, 255, 255, 255}
 	ColorTransparent = color.RGBA{0, 0, 0, 0}
@@ -37,4 +41,5 @@ type Event uint8
 
 const (
 	EventNoOp Event = iota
+	EventPlayerShoot
 )

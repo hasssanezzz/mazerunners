@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"iter"
 	"math/rand"
+	"slices"
 )
 
 type Config struct {
@@ -70,7 +71,11 @@ func NewMap(size int, cfg *Config) *Map {
 func (m *Map) FillRandom() {
 	for cell := range m.Items() {
 		if rand.Intn(10) == 5 {
-			m.Matrix[cell.Row][cell.Col] = CellWall
+			if rand.Float32() > 0.5 {
+				m.Matrix[cell.Row][cell.Col] = CellWall
+			} else {
+				m.Matrix[cell.Row][cell.Col] = CellWood
+			}
 			continue
 		}
 
@@ -101,6 +106,11 @@ func (m *Map) Items() iter.Seq[Cell] {
 			}
 		}
 	}
+}
+
+func (m *Map) CanMoveTo(x, y int) bool {
+	blocks := []CellKind{CellWall, CellWood}
+	return !slices.Contains(blocks, m.Matrix[y][x])
 }
 
 type Camera struct {

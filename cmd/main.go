@@ -11,7 +11,7 @@ import (
 func main() {
 	cfg := &config.Config{
 		WindowSize: 500,
-		CellSize:   50,
+		CellSize:   25,
 		MapSize:    100,
 	}
 

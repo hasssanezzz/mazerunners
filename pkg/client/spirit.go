@@ -21,12 +21,61 @@ type Spirit interface {
 	HandleEvent(config.Event)
 	Update()
 	Draw(*ebiten.Image)
+	Alive() bool
 }
 
+const arrowSpeed = 2 // ticks between each tile move
+
 type Arrow struct {
-	Position  config.Point
-	Direction config.Direction
-	Destroyed bool
+	position   config.Point
+	direction  config.Direction
+	alive      bool
+	ticksAlive int
+
+	world  *config.Map
+	camera *config.Camera
+	cfg    *config.Config
+}
+
+var _ Spirit = (*Arrow)(nil)
+
+func (a *Arrow) HandleEvent(e config.Event) {}
+func (a *Arrow) Alive() bool                { return a.alive }
+
+func (a *Arrow) Update() {
+	a.ticksAlive++
+	if !a.alive || a.ticksAlive%arrowSpeed != 0 {
+		return
+	}
+
+	nx, ny := a.position.X, a.position.Y
+	switch a.direction {
+	case config.DirectionUp:
+		ny--
+	case config.DirectionDown:
+		ny++
+	case config.DirectionLeft:
+		nx--
+	case config.DirectionRight:
+		nx++
+	}
+
+	if !a.world.CanMoveTo(nx, ny) {
+		a.alive = false
+		return
+	}
+
+	a.position.X = nx
+	a.position.Y = ny
+}
+
+func (a *Arrow) Draw(screen *ebiten.Image) {
+	if !a.alive {
+		return
+	}
+	pos := a.camera.ToScreen(a.position.ToMapCell(a.cfg.CellSize))
+	size := float32(a.cfg.CellSize)
+	vector.FillRect(screen, float32(pos.X), float32(pos.Y), size, size, config.ColorRed, false)
 }
 
 type Player struct {
@@ -35,6 +84,7 @@ type Player struct {
 	Camera    *config.Camera
 	World     *config.Map
 	Coins     int
+	Spawn     func(Spirit)
 
 	cfg *config.Config
 }
@@ -52,12 +102,29 @@ func NewPlayer(pos config.Point, m *config.Map, c *config.Camera, cfg *config.Co
 	return p
 }
 
-func (p *Player) HandleEvent(e config.Event) {}
+func (p *Player) Alive() bool { return true }
+
+func (p *Player) HandleEvent(e config.Event) {
+	switch e {
+	case config.EventPlayerShoot:
+		if p.Spawn == nil {
+			return
+		}
+		p.Spawn(&Arrow{
+			position:  p.Position,
+			direction: p.Direction,
+			world:     p.World,
+			camera:    p.Camera,
+			cfg:       p.cfg,
+			alive:     true,
+		})
+	}
+}
 
 func (p *Player) Update() {
 	if isKeyActive(ebiten.KeyRight) {
 		p.Direction = config.DirectionRight
-		if p.canMoveTo(p.Position.X+1, p.Position.Y) {
+		if p.World.CanMoveTo(p.Position.X+1, p.Position.Y) {
 			p.Position.X += 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
 		}
@@ -65,7 +132,7 @@ func (p *Player) Update() {
 
 	if isKeyActive(ebiten.KeyLeft) {
 		p.Direction = config.DirectionLeft
-		if p.canMoveTo(p.Position.X-1, p.Position.Y) {
+		if p.World.CanMoveTo(p.Position.X-1, p.Position.Y) {
 			p.Position.X -= 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
 		}
@@ -73,7 +140,7 @@ func (p *Player) Update() {
 
 	if isKeyActive(ebiten.KeyUp) {
 		p.Direction = config.DirectionUp
-		if p.canMoveTo(p.Position.X, p.Position.Y-1) {
+		if p.World.CanMoveTo(p.Position.X, p.Position.Y-1) {
 			p.Position.Y -= 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
 		}
@@ -81,7 +148,7 @@ func (p *Player) Update() {
 
 	if isKeyActive(ebiten.KeyDown) {
 		p.Direction = config.DirectionDown
-		if p.canMoveTo(p.Position.X, p.Position.Y+1) {
+		if p.World.CanMoveTo(p.Position.X, p.Position.Y+1) {
 			p.Position.Y += 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
 		}
@@ -116,12 +183,8 @@ func (p *Player) Draw(screen *ebiten.Image) {
 		float32(start.Y),
 		float32(end.X),
 		float32(end.Y),
-		8,
+		4,
 		config.ColorRed,
 		false,
 	)
-}
-
-func (p *Player) canMoveTo(x, y int) bool {
-	return p.World.Matrix[y][x] != config.CellWall
 }
