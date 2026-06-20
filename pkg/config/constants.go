@@ -1,11 +1,11 @@
-package main
+package config
 
 import "image/color"
 
 type CellKind uint8
 
 const (
-	CellEmpty = iota
+	CellEmpty CellKind = iota
 	CellWall
 	CellTrap
 )
@@ -20,4 +20,19 @@ var (
 	ColorWhite       = color.RGBA{255, 255, 255, 255}
 	ColorTransparent = color.RGBA{0, 0, 0, 0}
 	ColorPureBlack   = color.RGBA{0, 0, 0, 255}
+)
+
+type Direction uint8
+
+const (
+	DirectionUp Direction = iota
+	DirectionRight
+	DirectionDown
+	DirectionLeft
+)
+
+type Event uint8
+
+const (
+	EventNoOp Event = iota
 )

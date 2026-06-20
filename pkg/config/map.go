@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -6,12 +6,40 @@ import (
 	"math/rand"
 )
 
+type Config struct {
+	WindowSize int
+	CellSize   int
+	MapSize    int
+}
+
+func (c *Config) GridLength() int {
+	return c.WindowSize / c.CellSize
+}
+
 type Point struct {
 	X, Y int
 }
 
+func NewPoint(x, y int) Point {
+	return Point{x, y}
+}
+
 func (p Point) String() string {
 	return fmt.Sprintf("(%d,%d)", p.X, p.Y)
+}
+
+func (p Point) ToMapCell(cellSize int) Point {
+	return Point{
+		X: p.X * cellSize,
+		Y: p.Y * cellSize,
+	}
+}
+
+func (p Point) ToScreenCord(cellSize int) Point {
+	return Point{
+		X: p.X / cellSize,
+		Y: p.Y / cellSize,
+	}
 }
 
 type Cell struct {
@@ -22,18 +50,18 @@ type Cell struct {
 }
 
 type Map struct {
-	matrix [][]CellKind
+	Matrix [][]CellKind
 	cfg    *Config
 }
 
 func NewMap(size int, cfg *Config) *Map {
 	m := &Map{
-		matrix: make([][]CellKind, size),
+		Matrix: make([][]CellKind, size),
 		cfg:    cfg,
 	}
 
 	for i := range size {
-		m.matrix[i] = make([]CellKind, size)
+		m.Matrix[i] = make([]CellKind, size)
 	}
 
 	return m
@@ -42,17 +70,17 @@ func NewMap(size int, cfg *Config) *Map {
 func (m *Map) FillRandom() {
 	for cell := range m.Items() {
 		if rand.Intn(10) == 5 {
-			m.matrix[cell.Row][cell.Col] = CellWall
+			m.Matrix[cell.Row][cell.Col] = CellWall
 		}
 	}
 }
 
 func (m *Map) FillBorders() {
-	n := len(m.matrix)
+	n := len(m.Matrix)
 	for row := range n {
 		for col := range n {
 			if row == 0 || row == n-1 || col == 0 || col == n-1 {
-				m.matrix[row][col] = CellWall
+				m.Matrix[row][col] = CellWall
 			}
 		}
 	}
@@ -60,7 +88,7 @@ func (m *Map) FillBorders() {
 
 func (m *Map) Items() iter.Seq[Cell] {
 	return func(yield func(Cell) bool) {
-		for row, line := range m.matrix {
+		for row, line := range m.Matrix {
 			for col, kind := range line {
 				if !yield(Cell{Kind: kind, Row: row, Col: col, Point: Point{X: col * m.cfg.CellSize, Y: row * m.cfg.CellSize}}) {
 					return
@@ -73,6 +101,10 @@ func (m *Map) Items() iter.Seq[Cell] {
 type Camera struct {
 	Point
 	cfg *Config
+}
+
+func NewCamera(pos Point, cfg *Config) *Camera {
+	return &Camera{Point: pos, cfg: cfg}
 }
 
 func (c *Camera) CenterOn(p Point) {
