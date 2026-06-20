@@ -71,6 +71,11 @@ func (m *Map) FillRandom() {
 	for cell := range m.Items() {
 		if rand.Intn(10) == 5 {
 			m.Matrix[cell.Row][cell.Col] = CellWall
+			continue
+		}
+
+		if rand.Intn(100) == 5 {
+			m.Matrix[cell.Row][cell.Col] = CellCoin
 		}
 	}
 }

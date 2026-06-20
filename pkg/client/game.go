@@ -28,6 +28,7 @@ func NewGame(cfg *config.Config) *Game {
 		world:  world,
 		camera: camera,
 		player: player,
+		debug:  true,
 	}
 }
 
@@ -36,10 +37,22 @@ func (g *Game) drawWorld(screen *ebiten.Image) {
 		if !g.camera.IsVisible(cell.Point) {
 			continue
 		}
-		if cell.Kind == config.CellWall {
-			pos := g.camera.ToScreen(cell.Point)
-			vector.FillRect(screen, float32(pos.X), float32(pos.Y), float32(g.cfg.CellSize), float32(g.cfg.CellSize), config.ColorGrey, false)
+
+		if cell.Kind == config.CellEmpty {
+			continue
 		}
+
+		pos := g.camera.ToScreen(cell.Point)
+		color := config.ColorGrey
+
+		switch cell.Kind {
+		case config.CellWall:
+			color = config.ColorGrey
+		case config.CellCoin:
+			color = config.ColorGold
+		}
+
+		vector.FillRect(screen, float32(pos.X), float32(pos.Y), float32(g.cfg.CellSize), float32(g.cfg.CellSize), color, false)
 	}
 }
 

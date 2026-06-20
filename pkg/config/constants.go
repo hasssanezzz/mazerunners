@@ -8,6 +8,7 @@ const (
 	CellEmpty CellKind = iota
 	CellWall
 	CellTrap
+	CellCoin
 )
 
 var (
@@ -16,6 +17,7 @@ var (
 	ColorBG      = color.RGBA{97, 135, 100, 255} // muted green (background)
 	ColorRed     = color.RGBA{245, 73, 39, 255}  // trap / pointer
 	ColorGrey    = color.RGBA{70, 80, 88, 255}   // wall
+	ColorGold    = color.RGBA{255, 191, 00, 255}
 
 	ColorWhite       = color.RGBA{255, 255, 255, 255}
 	ColorTransparent = color.RGBA{0, 0, 0, 0}

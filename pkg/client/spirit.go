@@ -7,10 +7,26 @@ import (
 	"github.com/hasssanezzz/mazerunners/pkg/config"
 )
 
+const (
+	keyRepeatDelay = 18 // ticks before repeat starts (~0.3s at 60fps)
+	keyRepeatRate  = 6  // ticks between repeated moves while held
+)
+
+func isKeyActive(key ebiten.Key) bool {
+	d := inpututil.KeyPressDuration(key)
+	return d == 1 || (d > keyRepeatDelay && (d-keyRepeatDelay)%keyRepeatRate == 0)
+}
+
 type Spirit interface {
 	HandleEvent(config.Event)
 	Update()
 	Draw(*ebiten.Image)
+}
+
+type Arrow struct {
+	Position  config.Point
+	Direction config.Direction
+	Destroyed bool
 }
 
 type Player struct {
@@ -18,6 +34,7 @@ type Player struct {
 	Direction config.Direction
 	Camera    *config.Camera
 	World     *config.Map
+	Coins     int
 
 	cfg *config.Config
 }
@@ -36,16 +53,6 @@ func NewPlayer(pos config.Point, m *config.Map, c *config.Camera, cfg *config.Co
 }
 
 func (p *Player) HandleEvent(e config.Event) {}
-
-const (
-	keyRepeatDelay = 18 // ticks before repeat starts (~0.3s at 60fps)
-	keyRepeatRate  = 6  // ticks between repeated moves while held
-)
-
-func isKeyActive(key ebiten.Key) bool {
-	d := inpututil.KeyPressDuration(key)
-	return d == 1 || (d > keyRepeatDelay && (d-keyRepeatDelay)%keyRepeatRate == 0)
-}
 
 func (p *Player) Update() {
 	if isKeyActive(ebiten.KeyRight) {
