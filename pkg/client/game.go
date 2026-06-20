@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -8,38 +10,48 @@ import (
 )
 
 type Game struct {
-	cfg    *config.Config
-	world  *config.Map
-	camera *config.Camera
+	cfg      *config.Config
+	world    *config.Map
+	camera   *config.Camera
+	network  Network
+	userInfo *config.UserInfo
 
 	spirits []Spirit
 	player  *Player
 	debug   bool
 }
 
-func NewGame(cfg *config.Config) *Game {
-	world := config.NewMap(cfg.MapSize, cfg)
-	world.FillRandom()
-	world.FillBorders()
+func NewGame(cfg *config.Config, network Network, userInfo *config.UserInfo) (*Game, error) {
+	response, err := network.Init(userInfo)
+	if err != nil {
+		return nil, fmt.Errorf("new game failed to init network: %v", err)
+	}
+
+	if response.World == nil {
+		return nil, fmt.Errorf("server sent nil world")
+	}
+	response.World.Cfg = cfg
 
 	start := config.Point{X: 1, Y: 1}
 	camera := config.NewCamera(start.ToMapCell(cfg.CellSize), cfg)
-	player := NewPlayer(start, world, camera, cfg)
+	player := NewPlayer(start, response.World, camera, cfg)
 
 	g := &Game{
-		cfg:     cfg,
-		world:   world,
-		camera:  camera,
-		player:  player,
-		spirits: make([]Spirit, 0, 100),
-		debug:   true,
+		cfg:      cfg,
+		world:    response.World,
+		camera:   camera,
+		player:   player,
+		network:  network,
+		userInfo: userInfo,
+		spirits:  make([]Spirit, 0, 100),
+		debug:    true,
 	}
 
 	player.Spawn = func(s Spirit) {
 		g.spirits = append(g.spirits, s)
 	}
 
-	return g
+	return g, nil
 }
 
 func (g *Game) drawWorld(screen *ebiten.Image) {

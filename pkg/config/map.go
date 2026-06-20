@@ -52,13 +52,14 @@ type Cell struct {
 
 type Map struct {
 	Matrix [][]CellKind
-	cfg    *Config
+	Cfg    *Config
 }
 
-func NewMap(size int, cfg *Config) *Map {
+func NewMap(cfg *Config) *Map {
+	size := cfg.MapSize
 	m := &Map{
 		Matrix: make([][]CellKind, size),
-		cfg:    cfg,
+		Cfg:    cfg,
 	}
 
 	for i := range size {
@@ -100,7 +101,7 @@ func (m *Map) Items() iter.Seq[Cell] {
 	return func(yield func(Cell) bool) {
 		for row, line := range m.Matrix {
 			for col, kind := range line {
-				if !yield(Cell{Kind: kind, Row: row, Col: col, Point: Point{X: col * m.cfg.CellSize, Y: row * m.cfg.CellSize}}) {
+				if !yield(Cell{Kind: kind, Row: row, Col: col, Point: Point{X: col * m.Cfg.CellSize, Y: row * m.Cfg.CellSize}}) {
 					return
 				}
 			}

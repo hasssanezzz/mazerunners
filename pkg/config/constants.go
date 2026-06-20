@@ -42,4 +42,5 @@ type Event uint8
 const (
 	EventNoOp Event = iota
 	EventPlayerShoot
+	EventPlayerInit
 )
