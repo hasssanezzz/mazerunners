@@ -11,6 +11,7 @@ type Game struct {
 	world  *config.Map
 	camera *config.Camera
 	player *Player
+	debug  bool
 }
 
 func NewGame(cfg *config.Config) *Game {
@@ -45,13 +46,15 @@ func (g *Game) drawWorld(screen *ebiten.Image) {
 func (g *Game) Update() error {
 	g.player.Update()
 
-	if ebiten.IsKeyPressed(ebiten.KeyLeftBracket) {
-		if g.cfg.CellSize > 10 {
-			g.cfg.CellSize--
+	if g.debug {
+		if ebiten.IsKeyPressed(ebiten.KeyLeftBracket) {
+			if g.cfg.CellSize > 10 {
+				g.cfg.CellSize--
+			}
 		}
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyRightBracket) {
-		g.cfg.CellSize++
+		if ebiten.IsKeyPressed(ebiten.KeyRightBracket) {
+			g.cfg.CellSize++
+		}
 	}
 
 	return nil
