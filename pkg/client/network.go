@@ -22,6 +22,7 @@ type Network interface {
 type UDPNetwork struct {
 	serverAddress *net.UDPAddr
 	conn          *net.UDPConn
+	localAddr     *net.UDPAddr
 
 	once sync.Once
 }
@@ -42,10 +43,12 @@ func (n *UDPNetwork) Init(info *config.UserInfo) (*config.InitResponse, error) {
 		return nil, err
 	}
 	n.conn = conn
-	info.Addr = conn.LocalAddr().(*net.UDPAddr)
+
+	n.localAddr = conn.LocalAddr().(*net.UDPAddr)
+	info.Addr = n.localAddr
 
 	m := &config.Message{
-		From:    info.Addr.String(),
+		From:    n.localAddr.String(),
 		Event:   config.EventPlayerInit,
 		Payload: info,
 	}
@@ -72,6 +75,8 @@ func (n *UDPNetwork) Init(info *config.UserInfo) (*config.InitResponse, error) {
 }
 
 func (n *UDPNetwork) PublishEvent(m *config.Message) error {
+	m.From = n.localAddr.String()
+
 	buf := bytes.NewBuffer(nil)
 	if err := gob.NewEncoder(buf).Encode(m); err != nil {
 		return err

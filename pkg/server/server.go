@@ -4,41 +4,83 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/hasssanezzz/mazerunners/pkg/config"
+	"go.uber.org/zap"
 )
 
+var logger *zap.Logger = func() *zap.Logger {
+	l, _ := zap.NewDevelopment()
+	return l
+}()
+
 type GameState struct {
-	world *config.Map
+	World *config.Map
+}
+
+type Room struct {
+	ID      int
+	State   *GameState
+	Clients map[string]*config.UserInfo
+}
+
+func (r *Room) addClient(client *config.UserInfo) {
+	r.Clients[client.Addr.String()] = client
 }
 
 type Server struct {
 	addr      *net.UDPAddr
-	clients   map[string]*config.UserInfo
 	running   bool
 	blacklist map[string]struct{}
-
-	state GameState
+	rooms     map[int]*Room
+	conn      *net.UDPConn
+	cfg       *config.Config
 }
 
 func NewServer(addr *net.UDPAddr, cfg *config.Config) *Server {
-	world := config.NewMap(cfg)
-	world.FillRandom()
-	world.FillBorders()
-
 	s := &Server{
 		addr:      addr,
-		clients:   make(map[string]*config.UserInfo),
 		running:   true,
 		blacklist: make(map[string]struct{}),
-		state: GameState{
-			world: world,
-		},
+		rooms:     map[int]*Room{},
+		cfg:       cfg,
 	}
 
 	return s
+}
+
+func (s *Server) resolveRoom(roomID int) (*Room, bool) {
+	if room, ok := s.rooms[roomID]; ok {
+		return room, false
+	}
+
+	world := config.NewMap(s.cfg)
+	world.FillRandom()
+	world.FillBorders()
+
+	r := &Room{
+		ID: roomID,
+		State: &GameState{
+			World: world,
+		},
+		Clients: map[string]*config.UserInfo{},
+	}
+	s.rooms[roomID] = r
+
+	return r, true
+}
+
+func (s *Server) findClientInRooms(addr string) (*config.UserInfo, bool) {
+	for _, room := range s.rooms {
+		for _, client := range room.Clients {
+			if client.Addr.String() == addr {
+				return client, true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 func (s *Server) Run() error {
@@ -46,12 +88,13 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
+	s.conn = conn
 
 	for s.running {
 		buf := make([]byte, 1024*4)
 		n, addr, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			log.Println("error happend while reading:", err)
+			logger.Error("error happend while reading", zap.Error(err))
 			continue
 		}
 		buf = buf[:n]
@@ -62,13 +105,13 @@ func (s *Server) Run() error {
 
 		var m config.Message
 		if err := gob.NewDecoder(bytes.NewBuffer(buf)).Decode(&m); err != nil {
-			log.Println("error happend while decoding:", err)
+			logger.Error("error happend while decoding", zap.Error(err))
 			continue
 		}
 
 		go func() {
-			if err := s.handleMessage(conn, addr, &m); err != nil {
-				log.Printf("error while handling message from %q: %v\n", addr.String(), err)
+			if err := s.handleMessage(addr, &m); err != nil {
+				logger.Error("error happend while handling message", zap.Error(err))
 			}
 		}()
 	}
@@ -76,40 +119,110 @@ func (s *Server) Run() error {
 	return nil
 }
 
-func (s *Server) handleMessage(conn *net.UDPConn, addr *net.UDPAddr, m *config.Message) error {
-	if m.From != addr.String() {
-		log.Println("client addr message mismatch, backlisting the client")
+func (s *Server) broadcast(roomID int, m *config.Message, senderAddr *net.UDPAddr) error {
+	room, ok := s.rooms[roomID]
+	if !ok {
+		return ErrRoomNotFound{roomID}
 	}
 
-	_, ok := s.clients[addr.String()]
-	if !ok {
-		if m.Event == config.EventPlayerInit {
-			info, ok := m.Payload.(*config.UserInfo)
-			if !ok {
-				return fmt.Errorf("message type payload mismatch")
-			}
-
-			s.clients[info.Addr.String()] = info
-
-			response := config.InitResponse{
-				World:       s.state.world,
-				PlayerCount: len(s.clients),
-			}
-			buf := bytes.NewBuffer(nil)
-			if err := gob.NewEncoder(buf).Encode(response); err != nil {
-				return err
-			}
-			n, err := conn.WriteToUDP(buf.Bytes(), addr)
-			if err != nil {
-				return err
-			}
-
-			if n != buf.Len() {
-				panic("n != buf.Len()") // temp debug
-			}
-		} else {
-			log.Println("someone is sending an event before joining :/")
+	for _, client := range room.Clients {
+		if client.Addr.String() == senderAddr.String() {
+			continue
 		}
+
+		if err := s.sendMessage(client.Addr, m); err != nil {
+			logger.Warn("failed to send broadcast message", fieldPlayerName(client.Name), fieldAddr(client.Addr), zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) sendMessage(addr *net.UDPAddr, m *config.Message) error {
+	buf := bytes.NewBuffer(nil)
+	if err := gob.NewEncoder(buf).Encode(m); err != nil {
+		return err
+	}
+
+	_, err := s.conn.WriteToUDP(buf.Bytes(), addr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) sendBytes(addr *net.UDPAddr, data []byte) error {
+	_, err := s.conn.WriteToUDP(data, addr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) handleMessage(addr *net.UDPAddr, m *config.Message) error {
+	if m.From != addr.String() {
+		logger.Warn("client addr message mismatch, backlisting the client", fieldAddr(addr), zap.String("msgAddr", m.From))
+		s.blacklist[addr.String()] = struct{}{}
+		return nil
+	}
+
+	client, ok := s.findClientInRooms(addr.String())
+	if !ok && m.Event != config.EventPlayerInit {
+		logger.Warn("someone is sending an event before joining :/", fieldAddr(addr))
+		return nil
+	}
+
+	switch m.Event {
+	case config.EventPlayerInit:
+		return s.handlePlayerInit(addr, m)
+	case config.EventPlayerStateChange:
+		return s.handlePlayStateChange(client, addr, m)
+	}
+
+	return nil
+}
+
+func (s *Server) handlePlayerInit(addr *net.UDPAddr, m *config.Message) error {
+	info, ok := m.Payload.(*config.UserInfo)
+	if !ok {
+		return fmt.Errorf("message payload type mismatch")
+	}
+
+	room, created := s.resolveRoom(info.Room)
+	if created {
+		logger.Info("new room created", fieldRoom(info.Room))
+	}
+	room.addClient(info)
+
+	response := config.InitResponse{
+		World:       room.State.World,
+		PlayerCount: len(room.Clients),
+	}
+	buf := bytes.NewBuffer(nil)
+	if err := gob.NewEncoder(buf).Encode(response); err != nil {
+		return err
+	}
+
+	if err := s.sendBytes(addr, buf.Bytes()); err != nil {
+		return err
+	}
+
+	logger.Info("player joined", fieldPlayerName(info.Name), fieldAddr(addr), fieldRoom(info.Room))
+
+	return nil
+}
+
+func (s *Server) handlePlayStateChange(client *config.UserInfo, addr *net.UDPAddr, m *config.Message) error {
+	state, ok := m.Payload.(*config.PlayerStateChangePayload)
+	if !ok {
+		return fmt.Errorf("message type payload mismatch")
+	}
+
+	fmt.Printf("-- player %s is moving, Point: %s Direction: %d\n", client.Name, state.Point, state.Dir)
+	if err := s.broadcast(client.Room, m, addr); err != nil {
+		return err
 	}
 
 	return nil

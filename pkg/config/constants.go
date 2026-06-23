@@ -43,4 +43,5 @@ const (
 	EventNoOp Event = iota
 	EventPlayerShoot
 	EventPlayerInit
+	EventPlayerStateChange
 )

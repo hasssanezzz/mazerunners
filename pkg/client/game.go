@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -49,6 +50,20 @@ func NewGame(cfg *config.Config, network Network, userInfo *config.UserInfo) (*G
 
 	player.Spawn = func(s Spirit) {
 		g.spirits = append(g.spirits, s)
+	}
+
+	// TODO: react when other players join
+
+	player.OnStateChange = func(p config.Point, d config.Direction) {
+		if err := network.PublishEvent(&config.Message{
+			Event: config.EventPlayerStateChange,
+			Payload: &config.PlayerStateChangePayload{
+				Point: p,
+				Dir:   d,
+			},
+		}); err != nil {
+			log.Println("failed to public event:", err)
+		}
 	}
 
 	return g, nil

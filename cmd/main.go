@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hasssanezzz/mazerunners/pkg/client"
@@ -26,9 +27,15 @@ func requireEnvVar(name, value, msg string) string {
 func runClient() {
 	playerName := requireEnvVar("MZRN_PLAYER_NAME", "", "please provide MZRN_PLAYER_NAME")
 	playerPassword := requireEnvVar("MZRN_PLAYER_PASSWORD", "", "please provide MZRN_PLAYER_PASSWORD")
-	serverAddress := requireEnvVar("MZRN_SERVER_ADDRESS", "0.0.0.0:8000", "please provide MZRN_SERVER_ADDRESS")
+	serverAddress := requireEnvVar("MZRN_SERVER_ADDRESS", "0.0.0.0:8000", "")
+	roomID := requireEnvVar("MZRN_ROOM_ID", "1", "")
 
 	serverUdpAddr, err := net.ResolveUDPAddr("udp", serverAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	roomIDAsInt, err := strconv.Atoi(roomID)
 	if err != nil {
 		panic(err)
 	}
@@ -36,6 +43,7 @@ func runClient() {
 	userInfo := &config.UserInfo{
 		Name:   playerName,
 		Secret: playerPassword,
+		Room:   roomIDAsInt,
 	}
 
 	network := client.NewUDPNetwork(serverUdpAddr)
@@ -80,10 +88,11 @@ func runServer() {
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "serve" {
-		println("running server")
+		println("------------------- running server -------------------")
 		runServer()
 		return
 	}
 
+	println("------------------- running client -------------------")
 	runClient()
 }
