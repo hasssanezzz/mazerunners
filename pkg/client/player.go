@@ -7,6 +7,8 @@ import (
 	"github.com/hasssanezzz/mazerunners/pkg/config"
 )
 
+const arrowsPerCoin = 3
+
 type Player struct {
 	Position      config.Point
 	Direction     config.Direction
@@ -41,26 +43,30 @@ func (p *Player) HandleEvent(e config.Event) {
 		if p.Spawn == nil {
 			return
 		}
-		p.Spawn(&Arrow{
-			position:  p.Position,
-			direction: p.Direction,
-			world:     p.World,
-			camera:    p.Camera,
-			cfg:       p.cfg,
-			alive:     true,
-		})
+		if p.Coins > 0 {
+			p.Spawn(&Arrow{
+				position:  p.Position,
+				direction: p.Direction,
+				world:     p.World,
+				camera:    p.Camera,
+				cfg:       p.cfg,
+				alive:     true,
+			})
+			p.Coins--
+		}
 	}
 }
 
 func (p *Player) Update() {
-
 	// TODO: only run OnStateChange when state actually differs
+	moved := false
 
 	if isKeyActive(ebiten.KeyRight) {
 		p.Direction = config.DirectionRight
 		if p.World.CanMoveTo(p.Position.X+1, p.Position.Y) {
 			p.Position.X += 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
+			moved = true
 		}
 		p.OnStateChange(p.Position, p.Direction)
 	}
@@ -70,6 +76,7 @@ func (p *Player) Update() {
 		if p.World.CanMoveTo(p.Position.X-1, p.Position.Y) {
 			p.Position.X -= 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
+			moved = true
 		}
 		p.OnStateChange(p.Position, p.Direction)
 	}
@@ -79,6 +86,7 @@ func (p *Player) Update() {
 		if p.World.CanMoveTo(p.Position.X, p.Position.Y-1) {
 			p.Position.Y -= 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
+			moved = true
 		}
 		p.OnStateChange(p.Position, p.Direction)
 	}
@@ -88,8 +96,19 @@ func (p *Player) Update() {
 		if p.World.CanMoveTo(p.Position.X, p.Position.Y+1) {
 			p.Position.Y += 1
 			p.Camera.CenterOn(p.Position.ToMapCell(p.cfg.CellSize))
+			moved = true
 		}
 		p.OnStateChange(p.Position, p.Direction)
+	}
+
+	if !moved {
+		return
+	}
+
+	cell, _ := p.World.Get(p.Position)
+	if cell == config.CellCoin {
+		p.World.Set(p.Position, config.CellEmpty)
+		p.Coins += arrowsPerCoin
 	}
 }
 

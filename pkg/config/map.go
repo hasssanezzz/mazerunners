@@ -69,6 +69,21 @@ func NewMap(cfg *Config) *Map {
 	return m
 }
 
+func (m *Map) Get(p Point) (CellKind, bool) {
+	if p.X < 0 || p.X >= len(m.Matrix) || p.Y < 0 || p.Y >= len(m.Matrix) {
+		return 0, false
+	}
+	return m.Matrix[p.Y][p.X], true
+}
+
+func (m *Map) Set(p Point, cell CellKind) {
+	_, ok := m.Get(p)
+	if !ok {
+		return
+	}
+	m.Matrix[p.Y][p.X] = cell
+}
+
 func (m *Map) FillRandom() {
 	for cell := range m.Items() {
 		if rand.Intn(10) == 5 {
@@ -110,8 +125,13 @@ func (m *Map) Items() iter.Seq[Cell] {
 }
 
 func (m *Map) CanMoveTo(x, y int) bool {
+	cell, ok := m.Get(Point{x, y})
+	if !ok {
+		return false
+	}
+
 	blocks := []CellKind{CellWall, CellWood}
-	return !slices.Contains(blocks, m.Matrix[y][x])
+	return !slices.Contains(blocks, cell)
 }
 
 type Camera struct {
