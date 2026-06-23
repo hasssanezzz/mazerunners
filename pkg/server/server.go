@@ -29,6 +29,7 @@ func (r *Room) addClient(client *config.UserInfo) {
 	r.Clients[client.Addr.String()] = client
 }
 
+// TODO: we have zero thread safty
 type Server struct {
 	addr      *net.UDPAddr
 	running   bool

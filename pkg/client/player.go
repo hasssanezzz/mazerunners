@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/hasssanezzz/mazerunners/pkg/config"
 )
@@ -12,6 +13,7 @@ type Player struct {
 	Camera        *config.Camera
 	World         *config.Map
 	Coins         int
+	Name          string
 	Spawn         func(Spirit)
 	OnStateChange func(config.Point, config.Direction)
 
@@ -51,6 +53,9 @@ func (p *Player) HandleEvent(e config.Event) {
 }
 
 func (p *Player) Update() {
+
+	// TODO: only run OnStateChange when state actually differs
+
 	if isKeyActive(ebiten.KeyRight) {
 		p.Direction = config.DirectionRight
 		if p.World.CanMoveTo(p.Position.X+1, p.Position.Y) {
@@ -91,6 +96,15 @@ func (p *Player) Update() {
 func (p *Player) Draw(screen *ebiten.Image) {
 	cord := p.Camera.ToScreen(p.Position.ToMapCell(p.cfg.CellSize))
 	vector.FillRect(screen, float32(cord.X), float32(cord.Y), float32(p.cfg.CellSize), float32(p.cfg.CellSize), config.ColorPrimary, false)
+
+	if p.Name != "" {
+		face := &text.GoTextFace{Source: mplusFaceSource, Size: 11}
+		w, _ := text.Measure(p.Name, face, 0)
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(float64(cord.X)+float64(p.cfg.CellSize)/2-w/2, float64(cord.Y)+float64(p.cfg.CellSize)+2)
+		op.ColorScale.ScaleWithColor(config.ColorBlack)
+		text.Draw(screen, p.Name, face, op)
+	}
 
 	cellSize := p.cfg.CellSize
 

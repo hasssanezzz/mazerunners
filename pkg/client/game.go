@@ -1,14 +1,28 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/hasssanezzz/mazerunners/pkg/config"
 )
+
+var mplusFaceSource *text.GoTextFaceSource
+
+func init() {
+	s, err := text.NewGoTextFaceSource(bytes.NewReader(fonts.MPlus1pRegular_ttf))
+	if err != nil {
+		log.Fatal(err)
+	}
+	mplusFaceSource = s
+}
 
 type Game struct {
 	cfg      *config.Config
@@ -17,9 +31,10 @@ type Game struct {
 	network  Network
 	userInfo *config.UserInfo
 
-	spirits []Spirit
-	player  *Player
-	debug   bool
+	spirits     []Spirit
+	player      *Player
+	playerCount int
+	debug       bool
 }
 
 func NewGame(cfg *config.Config, network Network, userInfo *config.UserInfo) (*Game, error) {
@@ -36,14 +51,16 @@ func NewGame(cfg *config.Config, network Network, userInfo *config.UserInfo) (*G
 	start := config.Point{X: 1, Y: 1}
 	camera := config.NewCamera(start.ToMapCell(cfg.CellSize), cfg)
 	player := NewPlayer(start, response.World, camera, cfg)
+	player.Name = userInfo.Name
 
 	g := &Game{
-		cfg:      cfg,
-		world:    response.World,
-		camera:   camera,
-		player:   player,
-		network:  network,
-		userInfo: userInfo,
+		cfg:         cfg,
+		world:       response.World,
+		camera:      camera,
+		player:      player,
+		network:     network,
+		userInfo:    userInfo,
+		playerCount: response.PlayerCount,
 		spirits:  make([]Spirit, 0, 100),
 		debug:    true,
 	}
@@ -128,6 +145,31 @@ func (g *Game) Update() error {
 	return nil
 }
 
+func (g *Game) drawHUD(screen *ebiten.Image) {
+	items := map[string]string{
+		"Coins":   fmt.Sprintf("%d", g.player.Coins),
+		"Players": fmt.Sprintf("%d", g.playerCount),
+	}
+
+	face := &text.GoTextFace{Source: mplusFaceSource, Size: 14}
+	const lineHeight = 20
+	y := float64(g.cfg.WindowSize) - float64(len(items))*lineHeight - 8
+
+	keys := make([]string, 0, len(items))
+	for k := range items {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(10, y)
+		op.ColorScale.ScaleWithColor(config.ColorBlack)
+		text.Draw(screen, fmt.Sprintf("%s: %s", k, items[k]), face, op)
+		y += lineHeight
+	}
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(config.ColorBG)
 	g.drawWorld(screen)
@@ -135,6 +177,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		s.Draw(screen)
 	}
 	g.player.Draw(screen)
+	g.drawHUD(screen)
 }
 
 func (g *Game) Layout(_, _ int) (int, int) {

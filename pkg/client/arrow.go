@@ -25,8 +25,11 @@ func (a *Arrow) HandleEvent(e config.Event) {}
 func (a *Arrow) Alive() bool                { return a.alive }
 
 func (a *Arrow) Update() {
+	if !a.alive {
+		return
+	}
 	a.ticksAlive++
-	if !a.alive || a.ticksAlive%arrowSpeed != 0 {
+	if a.ticksAlive%arrowSpeed != 0 {
 		return
 	}
 
